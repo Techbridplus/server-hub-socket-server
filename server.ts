@@ -3,7 +3,13 @@ import { Server } from "socket.io"
 import dotenv from "dotenv"
 
 dotenv.config()
-const httpServer = createServer()
+
+// Create HTTP server with a basic response so Render can detect an open port
+const httpServer = createServer((req, res) => {
+  res.writeHead(200)
+  res.end("Socket.io server is up and running!")
+})
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
@@ -19,7 +25,6 @@ interface DirectMessage {
   createdAt: string
 }
 
-//inbuilt connection
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId as string
   const serverId = socket.handshake.query.serverId as string
@@ -32,24 +37,20 @@ io.on("connection", async (socket) => {
     socket.join(`server:${serverId}`)
   }
 
-  // Handle direct messages
   socket.on("directMessage", (message: DirectMessage) => {
     io.to(`user:${message.receiverId}`).emit("directMessage", message)
   })
 
-  // Handle channel joining
   socket.on("join-channel", (channelId: string) => {
     socket.join(`channel:${channelId}`)
     console.log(`User ${userId} joined channel ${channelId}`)
   })
 
-  // Handle channel leaving
   socket.on("leave-channel", (channelId: string) => {
     socket.leave(`channel:${channelId}`)
     console.log(`User ${userId} left channel ${channelId}`)
   })
 
-  // Handle typing start
   socket.on("typing-start", (data: { channelId: string, user: { id: string, name: string } }) => {
     socket.to(`channel:${data.channelId}`).emit("user-typing", {
       userId: data.user.id,
@@ -57,14 +58,12 @@ io.on("connection", async (socket) => {
     })
   })
 
-  // Handle typing stop
   socket.on("typing-stop", (data: { channelId: string, userId: string }) => {
     socket.to(`channel:${data.channelId}`).emit("user-stopped-typing", {
       userId: data.userId
     })
   })
 
-  // Handle channel messages
   socket.on("send-message", async (data: { 
     channelId: string, 
     content: string,
@@ -92,14 +91,13 @@ io.on("connection", async (socket) => {
   socket.on("disconnect", async () => {
     if (userId) {
       console.log(`User ${userId} disconnected`)
-
-      
     }
   })
 })
 
-const PORT = process.env.SOCKET_PORT || 5000
+// Use PORT from environment, required by Render
+const PORT = process.env.PORT || 5000
 
 httpServer.listen(PORT, () => {
   console.log(`Socket.io server running on port ${PORT}`)
-}) 
+})
