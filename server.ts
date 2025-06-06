@@ -12,7 +12,7 @@ const httpServer = createServer((req, res) => {
 
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    origin: process.env.NEXT_PUBLIC_APP_URL || "https://server-hub-optimised.vercel.app/",
     methods: ["GET", "POST"]
   }
 })
