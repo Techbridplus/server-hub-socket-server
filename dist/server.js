@@ -14,11 +14,12 @@ const httpServer = (0, http_1.createServer)((req, res) => {
 });
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        origin: process.env.NEXT_PUBLIC_APP_URL || "https://server-hub-optimised.vercel.app/",
         methods: ["GET", "POST"]
     }
 });
 io.on("connection", async (socket) => {
+    console.log("A user connected");
     const userId = socket.handshake.query.userId;
     const serverId = socket.handshake.query.serverId;
     if (userId) {

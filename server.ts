@@ -4,6 +4,14 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
+interface DirectMessage {
+  id: string
+  content: string
+  senderId: string
+  receiverId: string
+  createdAt: string
+}
+
 // Create HTTP server with a basic response so Render can detect an open port
 const httpServer = createServer((req, res) => {
   res.writeHead(200)
@@ -17,15 +25,11 @@ const io = new Server(httpServer, {
   }
 })
 
-interface DirectMessage {
-  id: string
-  content: string
-  senderId: string
-  receiverId: string
-  createdAt: string
-}
+
 
 io.on("connection", async (socket) => {
+
+  console.log("A user connected")
   const userId = socket.handshake.query.userId as string
   const serverId = socket.handshake.query.serverId as string
 
