@@ -14,14 +14,22 @@ const httpServer = (0, http_1.createServer)((req, res) => {
 });
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: process.env.NEXT_PUBLIC_APP_URL || "https://server-hub-optimised.vercel.app/",
-        methods: ["GET", "POST"]
-    }
+        origin: "https://server-hub-optimised.vercel.app",
+        methods: ["GET", "POST"],
+        credentials: true, // Ensure credentials are allowed
+    },
 });
-io.on("connection", async (socket) => {
+httpServer.on("request", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "https://server-hub-optimised.vercel.app");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+});
+io.on("connection", (socket) => {
     console.log("A user connected");
-    const userId = socket.handshake.query.userId;
-    const serverId = socket.handshake.query.serverId;
+    // Extract handshake query parameters properly
+    const userId = socket.handshake.query.userId || null;
+    const serverId = socket.handshake.query.serverId || null;
     if (userId) {
         socket.join(`user:${userId}`);
     }
@@ -29,41 +37,52 @@ io.on("connection", async (socket) => {
         socket.join(`server:${serverId}`);
     }
     socket.on("directMessage", (message) => {
-        io.to(`user:${message.receiverId}`).emit("directMessage", message);
+        if (message.receiverId) {
+            io.to(`user:${message.receiverId}`).emit("directMessage", message);
+        }
     });
     socket.on("join-channel", (channelId) => {
-        socket.join(`channel:${channelId}`);
-        console.log(`User ${userId} joined channel ${channelId}`);
+        if (channelId) {
+            socket.join(`channel:${channelId}`);
+            console.log(`User ${userId} joined channel ${channelId}`);
+        }
     });
     socket.on("leave-channel", (channelId) => {
-        socket.leave(`channel:${channelId}`);
-        console.log(`User ${userId} left channel ${channelId}`);
+        if (channelId) {
+            socket.leave(`channel:${channelId}`);
+            console.log(`User ${userId} left channel ${channelId}`);
+        }
     });
     socket.on("typing-start", (data) => {
-        socket.to(`channel:${data.channelId}`).emit("user-typing", {
-            userId: data.user.id,
-            username: data.user.name
-        });
+        if (data.channelId && data.user.id) {
+            socket.to(`channel:${data.channelId}`).emit("user-typing", {
+                userId: data.user.id,
+                username: data.user.name,
+            });
+        }
     });
     socket.on("typing-stop", (data) => {
-        socket.to(`channel:${data.channelId}`).emit("user-stopped-typing", {
-            userId: data.userId
-        });
+        if (data.channelId && data.userId) {
+            socket.to(`channel:${data.channelId}`).emit("user-stopped-typing", {
+                userId: data.userId,
+            });
+        }
     });
-    socket.on("send-message", async (data) => {
-        console.log("Received message:", data);
-        const message = {
-            id: data.messageId,
-            content: data.content,
-            channelId: data.channelId,
-            userId: data.user.id,
-            user: data.user,
-            createdAt: new Date().toISOString()
-        };
-        io.to(`channel:${data.channelId}`).emit("new-message", message);
-        console.log(`Broadcasting message to channel ${data.channelId}`);
+    socket.on("send-message", (data) => {
+        if (data.channelId && data.messageId && data.user.id) {
+            const message = {
+                id: data.messageId,
+                content: data.content,
+                channelId: data.channelId,
+                userId: data.user.id,
+                user: data.user,
+                createdAt: new Date().toISOString(),
+            };
+            io.to(`channel:${data.channelId}`).emit("new-message", message);
+            console.log(`Broadcasting message to channel ${data.channelId}`);
+        }
     });
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
         if (userId) {
             console.log(`User ${userId} disconnected`);
         }

@@ -1,108 +1,121 @@
-import { createServer } from "http"
-import { Server } from "socket.io"
-import dotenv from "dotenv"
+import { createServer } from "http";
+import { Server } from "socket.io";
+import dotenv from "dotenv";
 
-dotenv.config()
+dotenv.config();
 
 interface DirectMessage {
-  id: string
-  content: string
-  senderId: string
-  receiverId: string
-  createdAt: string
+  id: string;
+  content: string;
+  senderId: string;
+  receiverId: string;
+  createdAt: string;
 }
 
 // Create HTTP server with a basic response so Render can detect an open port
 const httpServer = createServer((req, res) => {
-  res.writeHead(200)
-  res.end("Socket.io server is up and running!")
-})
+  res.writeHead(200);
+  res.end("Socket.io server is up and running!");
+});
 
 const io = new Server(httpServer, {
   cors: {
     origin: "https://server-hub-optimised.vercel.app",
     methods: ["GET", "POST"],
-    credentials: true
-  }
-})
+    credentials: true, // Ensure credentials are allowed
+  },
+});
 
+httpServer.on("request", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://server-hub-optimised.vercel.app");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+});
 
+io.on("connection", (socket) => {
+  console.log("A user connected");
 
-io.on("connection", async (socket) => {
-
-  console.log("A user connected")
-  const userId = socket.handshake.query.userId as string
-  const serverId = socket.handshake.query.serverId as string
+  // Extract handshake query parameters properly
+  const userId = socket.handshake.query.userId as string || null;
+  const serverId = socket.handshake.query.serverId as string || null;
 
   if (userId) {
-    socket.join(`user:${userId}`)
+    socket.join(`user:${userId}`);
   }
 
   if (serverId) {
-    socket.join(`server:${serverId}`)
+    socket.join(`server:${serverId}`);
   }
 
   socket.on("directMessage", (message: DirectMessage) => {
-    io.to(`user:${message.receiverId}`).emit("directMessage", message)
-  })
+    if (message.receiverId) {
+      io.to(`user:${message.receiverId}`).emit("directMessage", message);
+    }
+  });
 
   socket.on("join-channel", (channelId: string) => {
-    socket.join(`channel:${channelId}`)
-    console.log(`User ${userId} joined channel ${channelId}`)
-  })
+    if (channelId) {
+      socket.join(`channel:${channelId}`);
+      console.log(`User ${userId} joined channel ${channelId}`);
+    }
+  });
 
   socket.on("leave-channel", (channelId: string) => {
-    socket.leave(`channel:${channelId}`)
-    console.log(`User ${userId} left channel ${channelId}`)
-  })
+    if (channelId) {
+      socket.leave(`channel:${channelId}`);
+      console.log(`User ${userId} left channel ${channelId}`);
+    }
+  });
 
-  socket.on("typing-start", (data: { channelId: string, user: { id: string, name: string } }) => {
-    socket.to(`channel:${data.channelId}`).emit("user-typing", {
-      userId: data.user.id,
-      username: data.user.name
-    })
-  })
+  socket.on("typing-start", (data: { channelId: string; user: { id: string; name: string } }) => {
+    if (data.channelId && data.user.id) {
+      socket.to(`channel:${data.channelId}`).emit("user-typing", {
+        userId: data.user.id,
+        username: data.user.name,
+      });
+    }
+  });
 
-  socket.on("typing-stop", (data: { channelId: string, userId: string }) => {
-    socket.to(`channel:${data.channelId}`).emit("user-stopped-typing", {
-      userId: data.userId
-    })
-  })
+  socket.on("typing-stop", (data: { channelId: string; userId: string }) => {
+    if (data.channelId && data.userId) {
+      socket.to(`channel:${data.channelId}`).emit("user-stopped-typing", {
+        userId: data.userId,
+      });
+    }
+  });
 
-  socket.on("send-message", async (data: { 
-    channelId: string, 
-    content: string,
-    user: {
-      id: string,
-      name: string,
-      image: string | null
-    },
-    messageId: string
+  socket.on("send-message", (data: { 
+    channelId: string; 
+    content: string;
+    user: { id: string; name: string; image: string | null };
+    messageId: string;
   }) => {
-    console.log("Received message:", data)
-    const message = {
-      id: data.messageId,
-      content: data.content,
-      channelId: data.channelId,
-      userId: data.user.id,
-      user: data.user,
-      createdAt: new Date().toISOString()
-    }
+    if (data.channelId && data.messageId && data.user.id) {
+      const message = {
+        id: data.messageId,
+        content: data.content,
+        channelId: data.channelId,
+        userId: data.user.id,
+        user: data.user,
+        createdAt: new Date().toISOString(),
+      };
     
-    io.to(`channel:${data.channelId}`).emit("new-message", message)
-    console.log(`Broadcasting message to channel ${data.channelId}`)
-  })
-
-  socket.on("disconnect", async () => {
-    if (userId) {
-      console.log(`User ${userId} disconnected`)
+      io.to(`channel:${data.channelId}`).emit("new-message", message);
+      console.log(`Broadcasting message to channel ${data.channelId}`);
     }
-  })
-})
+  });
+
+  socket.on("disconnect", () => {
+    if (userId) {
+      console.log(`User ${userId} disconnected`);
+    }
+  });
+});
 
 // Use PORT from environment, required by Render
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 5000;
 
 httpServer.listen(PORT, () => {
-  console.log(`Socket.io server running on port ${PORT}`)
-})
+  console.log(`Socket.io server running on port ${PORT}`);
+});
