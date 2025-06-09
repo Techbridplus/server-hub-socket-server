@@ -9,6 +9,18 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 // Create HTTP server with a basic response so Render can detect an open port
 const httpServer = (0, http_1.createServer)((req, res) => {
+    // Set CORS headers
+    res.setHeader("Access-Control-Allow-Origin", "https://server-hub-optimised.vercel.app");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+    // Send response for other requests
     res.writeHead(200);
     res.end("Socket.io server is up and running!");
 });
@@ -18,12 +30,6 @@ const io = new socket_io_1.Server(httpServer, {
         methods: ["GET", "POST"],
         credentials: true, // Ensure credentials are allowed
     },
-});
-httpServer.on("request", (req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", "https://server-hub-optimised.vercel.app");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 });
 io.on("connection", (socket) => {
     console.log("A user connected");
